@@ -10,11 +10,13 @@
 void waitandkill(pid_t targetpid, char* targetname, int seconds);
 void logtext(char* info);
 void killcompetitors();
+void clearlogfile();
 
 //====================================================================================
 //MAIN FUNCTION
 //====================================================================================
 int main (int argc, char* argv[]) {
+	clearlogfile();
 
 	FILE* fp;
   	int seconds = 0;
@@ -25,8 +27,7 @@ int main (int argc, char* argv[]) {
   		logtext("Error: Invalid number of arguments.");
   		exit(1);
   	}
-  
-  	logtext("Debug: Starting...");
+
   	killcompetitors();
   	fp = fopen(argv[1], "r");
 
@@ -101,13 +102,20 @@ void logtext(char* info) {
   	time_t curtime;
   	struct tm * timeinfo;
   	char buff[80];
+  	FILE* logpointer = fopen(getenv("PROCNANNYLOGS"), "a");
 
   	time(&curtime);
   	timeinfo = localtime(&curtime);
   	strftime(buff, sizeof(buff), "%a %b %d %T %Z %Y", timeinfo);
-  	printf("[%s] %s.\n", buff, info);
-	fflush(stdout);
-  //TODO: Write to log file
+  	//printf("[%s] %s.\n", buff, info);
+	//fflush(stdout);
+  	fprintf(logpointer, "[%s] %s.\n", buff, info);
+  	fclose(logpointer);
+}
+
+void clearlogfile() {
+  	FILE* logpointer = fopen(getenv("PROCNANNYLOGS"), "w");
+  	fclose(logpointer);
 }
 
 void killcompetitors() {
