@@ -8,9 +8,11 @@
 #include "memwatch.h"
 
 void waitandkill(pid_t targetpid, char* targetname, int seconds);
-void logtext(char* info);
+void logtext(char* info, boolean debug);
 void killcompetitors();
 void clearlogfile();
+
+boolean debug = false;
 
 //====================================================================================
 //MAIN FUNCTION
@@ -24,7 +26,7 @@ int main (int argc, char* argv[]) {
   	int killcount = 0;
 
   	if (argc != 2) {
-  		logtext("Error: Invalid number of arguments.");
+  		logtext("Error: Invalid number of arguments.", debug);
   		exit(1);
   	}
 
@@ -35,7 +37,7 @@ int main (int argc, char* argv[]) {
 
   	FILE* cmdfp;
   	int pid;
-  	while (fscanf(fp, "%s", currentprocess) > 0) {
+  	while (fscanf(fp, "%s %d", currentprocess, seconds) > 0) {
   		char command[260] = "pgrep ";
   	 	strcat(command, currentprocess);
   	 	cmdfp = popen(command, "r");
@@ -43,11 +45,11 @@ int main (int argc, char* argv[]) {
   	 	if (fscanf(cmdfp, "%u", &pid) <= 0) {
   	 	 	char buff[285];
   	 	 	sprintf(buff, "Info: No '%s' processes found", currentprocess);
-  	 	 	logtext(buff);
+  	 	 	logtext(buff, debug);
   	 	} else {
   	 		char inittext[312];
   	 		sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d)", currentprocess, pid);
-  	 		logtext(inittext);
+  	 		logtext(inittext, debug);
   	 		waitandkill(pid, currentprocess, seconds);
   	 		killcount++;
   	 	}
@@ -55,7 +57,7 @@ int main (int argc, char* argv[]) {
   	 	while(fscanf(cmdfp, "%u", &pid) > 0) {
   	 		char inittext[312];
   	 		sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d)", currentprocess, pid);
-  	 		logtext(inittext);
+  	 		logtext(inittext, debug);
   	 		waitandkill(pid, currentprocess, seconds);
   	 		killcount++;
   	 	}
@@ -66,7 +68,7 @@ int main (int argc, char* argv[]) {
   	sleep(seconds + 2);
   	char exittext[40];
   	sprintf(exittext, "Info: Exiting. %d process(es) killed", killcount);
-  	logtext(exittext);
+  	logtext(exittext, debug);
   	return 0;
 }
 //====================================================================================
@@ -78,7 +80,7 @@ void waitandkill(pid_t targetpid, char* targetname, int seconds) {
   	fflush(stdout);
   	if ((pid = fork()) < 0) {
     	//err_sys("fork error");
-    	logtext("Error: Fork failed.");
+    	logtext("Error: Fork failed.", debug);
 	} else if (pid == 0) {
 	    //Child process
 	    sleep(seconds);
@@ -87,7 +89,7 @@ void waitandkill(pid_t targetpid, char* targetname, int seconds) {
 	    if (rv == 0) {
 	      	//Success
 	      	sprintf(infotext, "Action: PID %d (%s) killed after exceeding %d seconds", targetpid, targetname, seconds);
-	      	logtext(infotext);
+	      	logtext(infotext, debug);
 	    } else {
 	      	//Failed
 	    }
@@ -98,7 +100,7 @@ void waitandkill(pid_t targetpid, char* targetname, int seconds) {
 	}
 }
 
-void logtext(char* info) {
+void logtext(char* info, boolean debug) {
   	time_t curtime;
   	struct tm * timeinfo;
   	char buff[80];
@@ -107,8 +109,10 @@ void logtext(char* info) {
   	time(&curtime);
   	timeinfo = localtime(&curtime);
   	strftime(buff, sizeof(buff), "%a %b %d %T %Z %Y", timeinfo);
-  	//printf("[%s] %s.\n", buff, info);
-	//fflush(stdout);
+  	if (debug) {
+  		printf("[%s] %s.\n", buff, info);
+		fflush(stdout);
+  	}
   	fprintf(logpointer, "[%s] %s.\n", buff, info);
   	fclose(logpointer);
 }
