@@ -13,14 +13,20 @@ void killcompetitors();
 void clearlogfile();
 
 boolean debug = false;
+int interval = 5;
+
+FILE* configfp;
 
 //====================================================================================
 //MAIN FUNCTION
 //====================================================================================
 int main (int argc, char* argv[]) {
 	clearlogfile();
+	char starttext[34];
+	sprintf(starttext, "Info:  Parent process is PID %d", getpid());
+	logtext(starttext, debug);
 
-	FILE* fp;
+
   	int seconds = 0;
   	char currentprocess[255];
   	int killcount = 0;
@@ -31,44 +37,43 @@ int main (int argc, char* argv[]) {
   	}
 
   	killcompetitors();
-  	fp = fopen(argv[1], "r");
-
-  	fscanf(fp, "%u", &seconds);
+  	// Open config file.
+  	configfp = fopen(argv[1], "r");
 
   	FILE* cmdfp;
   	int pid;
-  	while (fscanf(fp, "%s %d", currentprocess, seconds) > 0) {
-  		char command[260] = "pgrep ";
-  	 	strcat(command, currentprocess);
-  	 	cmdfp = popen(command, "r");
 
-  	 	if (fscanf(cmdfp, "%u", &pid) <= 0) {
-  	 	 	char buff[285];
-  	 	 	sprintf(buff, "Info: No '%s' processes found", currentprocess);
-  	 	 	logtext(buff, debug);
-  	 	} else {
-  	 		char inittext[312];
-  	 		sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d)", currentprocess, pid);
-  	 		logtext(inittext, debug);
-  	 		waitandkill(pid, currentprocess, seconds);
-  	 		killcount++;
-  	 	}
+  	while (true) {
+  		while (fscanf(configfp, "%s %d", currentprocess, seconds) > 0) {
+  			char command[260] = "pgrep -x ";
+  	 		strcat(command, currentprocess);
+  	 		cmdfp = popen(command, "r");
 
-  	 	while(fscanf(cmdfp, "%u", &pid) > 0) {
-  	 		char inittext[312];
-  	 		sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d)", currentprocess, pid);
-  	 		logtext(inittext, debug);
-  	 		waitandkill(pid, currentprocess, seconds);
-  	 		killcount++;
-  	 	}
+  	 		if (fscanf(cmdfp, "%u", &pid) <= 0) {
+  	 	 		char buff[285];
+  	 	 		sprintf(buff, "Info: No '%s' processes found", currentprocess);
+  	 	 		logtext(buff, debug);
+  	 		} else {
+  	 			char inittext[312];
+  	 			sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d)", currentprocess, pid);
+  	 			logtext(inittext, debug);
+  	 			waitandkill(pid, currentprocess, seconds);
+  	 			killcount++;
+  	 		}
 
-  	 	pclose(cmdfp);
-  	}
+  	 		while(fscanf(cmdfp, "%u", &pid) > 0) {
+  	 			char inittext[312];
+  	 			sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d)", currentprocess, pid);
+  	 			logtext(inittext, debug);
+  	 			waitandkill(pid, currentprocess, seconds);
+  	 			killcount++;
+  	 		}
 
-  	sleep(seconds + 2);
-  	char exittext[40];
-  	sprintf(exittext, "Info: Exiting. %d process(es) killed", killcount);
-  	logtext(exittext, debug);
+  	 		pclose(cmdfp);
+  		}
+  		sleep(interval);
+    }
+
   	return 0;
 }
 //====================================================================================
