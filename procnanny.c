@@ -5,17 +5,27 @@
 #include <time.h>
 #include <signal.h>
 #include <string.h>
+#include <stdbool.h>
 #include "memwatch.h"
 
 void waitandkill(pid_t targetpid, char* targetname, int seconds);
-void logtext(char* info, boolean debug);
+void logtext(char* info, bool debug);
 void killcompetitors();
 void clearlogfile();
+void SIGINThandler(int sig);
+void SIGHUPhandler(int sig);
+bool inArray(int val);
+void insertInArray(int val);
+void removeFromProcArray(int val);
 
-boolean debug = false;
+bool debug = true;
 int interval = 5;
+int killcount = 0;
+int procarray[1024];
 
-FILE* configfp;
+bool SIGHUPcaught = false;
+bool SIGINTcaught = false;
+
 
 //====================================================================================
 //MAIN FUNCTION
@@ -26,10 +36,12 @@ int main (int argc, char* argv[]) {
 	sprintf(starttext, "Info:  Parent process is PID %d", getpid());
 	logtext(starttext, debug);
 
+	signal(SIGINT, SIGINThandler);
+	signal(SIGHUP, SIGHUPhandler);
 
   	int seconds = 0;
   	char currentprocess[255];
-  	int killcount = 0;
+	FILE* configfp;
 
   	if (argc != 2) {
   		logtext("Error: Invalid number of arguments.", debug);
@@ -44,16 +56,32 @@ int main (int argc, char* argv[]) {
   	int pid;
 
   	while (true) {
-  		while (fscanf(configfp, "%s %d", currentprocess, seconds) > 0) {
+  		// TODO: Check flags to see if signals have been caught
+  		if (SIGINTcaught) {
+  			fclose(configfp);
+  			killcompetitors();
+  			exit(0);
+  		}
+	  	if (SIGHUPcaught) {
+	  		rewind(configfp);
+
+  			SIGHUPcaught = false;
+  		}
+
+  		// Read config entries
+  		while (fscanf(configfp, "%s %d", currentprocess, &seconds) > 0) {
+  			// Find processes with names exactly matching currentprocess
   			char command[260] = "pgrep -x ";
   	 		strcat(command, currentprocess);
   	 		cmdfp = popen(command, "r");
 
+  	 		// Check if any processes exist
   	 		if (fscanf(cmdfp, "%u", &pid) <= 0) {
   	 	 		char buff[285];
   	 	 		sprintf(buff, "Info: No '%s' processes found", currentprocess);
   	 	 		logtext(buff, debug);
   	 		} else {
+  	 			// If processes are found
   	 			char inittext[312];
   	 			sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d)", currentprocess, pid);
   	 			logtext(inittext, debug);
@@ -61,6 +89,7 @@ int main (int argc, char* argv[]) {
   	 			killcount++;
   	 		}
 
+  	 		// Continue reading processes from command
   	 		while(fscanf(cmdfp, "%u", &pid) > 0) {
   	 			char inittext[312];
   	 			sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d)", currentprocess, pid);
@@ -105,7 +134,7 @@ void waitandkill(pid_t targetpid, char* targetname, int seconds) {
 	}
 }
 
-void logtext(char* info, boolean debug) {
+void logtext(char* info, bool debug) {
   	time_t curtime;
   	struct tm * timeinfo;
   	char buff[80];
@@ -136,6 +165,44 @@ void killcompetitors() {
 	while(fscanf(compfp, "%u", &pid) > 0) {
 		if (pid != ownpid) {
 	    	kill(pid, SIGKILL);
+		}
+	}
+}
+
+void SIGINThandler(int sig) {
+	char INTtext[128];
+	sprintf(INTtext, "Info: Caught SIGINT. Exiting cleanly.  %d process(es) killed", killcount);
+	logtext(INTtext, true);
+	SIGINTcaught = true;
+}
+
+void SIGHUPhandler(int sig) {
+	logtext("Info: Caught SIGHUP. Configuration file re-read", true);
+	SIGHUPcaught = true;
+}
+
+bool inProcArray(int val) {
+	for (int i = 0; i < 1024; i++) {
+		if (procarray[i] == val) {
+			return true;
+		}
+	}
+}
+
+void insertInProcArray(int val) {
+	for (int i = 0; i < 1024) {
+		if (procarray[i] == 0) {
+			procarray[i] = val;
+			break;
+		}
+	}
+}
+
+void removeFromProcArray(int val) {	
+	for (int i = 0; i < 1024) {
+		if (procarray[i] == val) {
+			procarray[i] = 0;
+			break;
 		}
 	}
 }
