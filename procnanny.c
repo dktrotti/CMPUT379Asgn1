@@ -14,8 +14,8 @@ void killcompetitors();
 void clearlogfile();
 void SIGINThandler(int sig);
 void SIGHUPhandler(int sig);
-bool inArray(int val);
-void insertInArray(int val);
+bool inProcArray(int val);
+void insertInProcArray(int val);
 void removeFromProcArray(int val);
 
 bool debug = true;
@@ -63,10 +63,10 @@ int main (int argc, char* argv[]) {
   			exit(0);
   		}
 	  	if (SIGHUPcaught) {
-	  		rewind(configfp);
-
   			SIGHUPcaught = false;
   		}
+	  	
+	  	rewind(configfp);
 
   		// Read config entries
   		while (fscanf(configfp, "%s %d", currentprocess, &seconds) > 0) {
@@ -82,20 +82,24 @@ int main (int argc, char* argv[]) {
   	 	 		logtext(buff, debug);
   	 		} else {
   	 			// If processes are found
-  	 			char inittext[312];
-  	 			sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d)", currentprocess, pid);
-  	 			logtext(inittext, debug);
-  	 			waitandkill(pid, currentprocess, seconds);
-  	 			killcount++;
+  	 			if (!inProcArray(pid)) {
+  	 				char inittext[312];
+  	 				sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d)", currentprocess, pid);
+  	 				logtext(inittext, debug);
+  	 				insertInProcArray(pid);
+  	 				waitandkill(pid, currentprocess, seconds);
+  	 			}
   	 		}
 
   	 		// Continue reading processes from command
   	 		while(fscanf(cmdfp, "%u", &pid) > 0) {
-  	 			char inittext[312];
-  	 			sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d)", currentprocess, pid);
-  	 			logtext(inittext, debug);
-  	 			waitandkill(pid, currentprocess, seconds);
-  	 			killcount++;
+  	 			if (!inProcArray(pid)) {
+  	 				char inittext[312];
+  	 				sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d)", currentprocess, pid);
+  	 				logtext(inittext, debug);
+  	 				insertInProcArray(pid);
+  	 				waitandkill(pid, currentprocess, seconds);
+  	 			}
   	 		}
 
   	 		pclose(cmdfp);
@@ -182,15 +186,18 @@ void SIGHUPhandler(int sig) {
 }
 
 bool inProcArray(int val) {
-	for (int i = 0; i < 1024; i++) {
+	int i;
+	for (i = 0; i < 1024; i++) {
 		if (procarray[i] == val) {
 			return true;
 		}
 	}
+	return false;
 }
 
 void insertInProcArray(int val) {
-	for (int i = 0; i < 1024) {
+	int i;
+	for (i = 0; i < 1024; i++) {
 		if (procarray[i] == 0) {
 			procarray[i] = val;
 			break;
@@ -199,7 +206,8 @@ void insertInProcArray(int val) {
 }
 
 void removeFromProcArray(int val) {	
-	for (int i = 0; i < 1024) {
+	int i;
+	for (i = 0; i < 1024; i++) {
 		if (procarray[i] == val) {
 			procarray[i] = 0;
 			break;
