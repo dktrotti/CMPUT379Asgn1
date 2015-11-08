@@ -6,9 +6,11 @@
 #include <signal.h>
 #include <string.h>
 #include <stdbool.h>
+#include <fcntl.h>
 #include "memwatch.h"
 
-void waitandkill(pid_t targetpid, char* targetname, int seconds);
+//void waitandkill(pid_t targetpid, char* targetname, int seconds);
+void spawnchild();
 void logtext(char* info, bool debug);
 void killcompetitors();
 void clearlogfile();
@@ -25,6 +27,9 @@ int procarray[1024];
 
 bool SIGHUPcaught = false;
 bool SIGINTcaught = false;
+
+int workpipe[2];
+int killpipe[2];
 
 
 //====================================================================================
@@ -48,6 +53,10 @@ int main (int argc, char* argv[]) {
   		exit(1);
   	}
 
+	pipe(workpipe);
+	pipe(killpipe);
+	fcntl(killpipe[0], F_SETFL, O_NONBLOCK);
+
   	killcompetitors();
   	// Open config file.
   	configfp = fopen(argv[1], "r");
@@ -55,14 +64,26 @@ int main (int argc, char* argv[]) {
   	FILE* cmdfp;
   	int pid;
 
+	char readbuf[2];
+  	int numbytes;
+
   	while (true) {
   		// TODO: Check flags to see if signals have been caught
   		if (SIGINTcaught) {
   			fclose(configfp);
+  			while (read(killpipe[0], readbuf, sizeof(readbuf)) != -1) {
+				if (readbuf[0] == 'k') {
+					killcount++;
+				}
+  			}
+			char INTtext[128];
+			sprintf(INTtext, "Info: Caught SIGINT. Exiting cleanly.  %d process(es) killed", killcount);
+			logtext(INTtext, true);
   			killcompetitors();
   			exit(0);
   		}
 	  	if (SIGHUPcaught) {
+			logtext("Info: Caught SIGHUP. Configuration file re-read", true);
   			SIGHUPcaught = false;
   		}
 	  	
@@ -87,7 +108,21 @@ int main (int argc, char* argv[]) {
   	 				sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d)", currentprocess, pid);
   	 				logtext(inittext, debug);
   	 				insertInProcArray(pid);
-  	 				waitandkill(pid, currentprocess, seconds);
+
+					numbytes = read(killpipe[0], readbuf, sizeof(readbuf));
+  	 				if (numbytes == -1) {
+						//No children available
+						spawnchild(workpipe, killpipe);
+					} else {
+						//Children available
+						if (readbuf[0] == 'k') {
+							killcount++;
+						}
+					}
+
+					char workstring[260];
+					sprintf(workstring, "%s %d %d\n", currentprocess, pid, seconds);
+					write(workpipe[1], workstring, sizeof(workstring));
   	 			}
   	 		}
 
@@ -98,7 +133,21 @@ int main (int argc, char* argv[]) {
   	 				sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d)", currentprocess, pid);
   	 				logtext(inittext, debug);
   	 				insertInProcArray(pid);
-  	 				waitandkill(pid, currentprocess, seconds);
+
+					numbytes = read(killpipe[0], readbuf, sizeof(readbuf));
+  	 				if (numbytes == -1) {
+						//No children available
+						spawnchild(workpipe, killpipe);
+					} else {
+						//Children available
+						if (readbuf[0] == 'k') {
+							killcount++;
+						}
+					}
+
+					char workstring[260];
+					sprintf(workstring, "%s %d %d\n", currentprocess, pid, seconds);
+					write(workpipe[1], workstring, sizeof(workstring));
   	 			}
   	 		}
 
@@ -112,28 +161,69 @@ int main (int argc, char* argv[]) {
 //====================================================================================
 
 
-void waitandkill(pid_t targetpid, char* targetname, int seconds) {
-  	pid_t pid;
+// void waitandkill(pid_t targetpid, char* targetname, int seconds) {
+//   	pid_t pid;
 
-  	fflush(stdout);
-  	if ((pid = fork()) < 0) {
-    	//err_sys("fork error");
+//   	fflush(stdout);
+//   	if ((pid = fork()) < 0) {
+//     	//err_sys("fork error");
+//     	logtext("Error: Fork failed.", debug);
+// 	} else if (pid == 0) {
+// 	    //Child process
+// 	    close(workpipe[1]) //Close writing end of workpipe
+// 	    close(killpipe[0]) //Close reading end of killpipe
+// 	    while(true) {
+// 	    	sleep(seconds);
+// 	    	char infotext[56];
+// 	    	int rv = kill(targetpid, SIGKILL);
+// 	    	if (rv == 0) {
+// 	      		//Success
+// 	      		sprintf(infotext, "Action: PID %d (%s) killed after exceeding %d seconds", targetpid, targetname, seconds);
+// 	      		logtext(infotext, debug);
+// 	    	} else {
+// 	      		//Failed
+// 	    	}	
+// 	    }
+// 	} else if (pid > 0) {
+// 	    //Parent process
+// 		return;
+// 	}
+// }
+
+void spawnchild() {
+	pid_t pid;
+
+	if((pid = fork()) < 0) {
+		//Fork error
     	logtext("Error: Fork failed.", debug);
 	} else if (pid == 0) {
-	    //Child process
-	    sleep(seconds);
-	    char infotext[56];
-	    int rv = kill(targetpid, SIGKILL);
-	    if (rv == 0) {
-	      	//Success
-	      	sprintf(infotext, "Action: PID %d (%s) killed after exceeding %d seconds", targetpid, targetname, seconds);
-	      	logtext(infotext, debug);
-	    } else {
-	      	//Failed
+		//Child process
+	    close(workpipe[1]); //Close writing end of workpipe
+	    close(killpipe[0]); //Close reading end of killpipe
+	    char targetname[256];
+	    pid_t targetpid;
+	    int seconds;
+	    while(true) {
+	    	char buf[260];
+	    	int readval = read(workpipe[0], buf, sizeof(buf));
+	    	if (readval == 0) {
+	    		exit(0);
+	    	}
+	    	sscanf(buf, "%s %d %d", targetname, &targetpid, &seconds);
+	    	sleep(seconds);
+	    	int killval = kill(targetpid, SIGKILL);
+	    	if (killval == 0) {
+	      		//Success
+	      		char infotext[320];
+	      		sprintf(infotext, "Action: PID %d (%s) killed after exceeding %d seconds", targetpid, targetname, seconds);
+	      		logtext(infotext, debug);
+	    		write(killpipe[1], "k\n", 2);
+	    	} else {
+	    		write(killpipe[1], "n\n", 2);
+	    	}
 	    }
-	    exit(0);
 	} else if (pid > 0) {
-	    //Parent process
+		//Parent process
 		return;
 	}
 }
@@ -174,14 +264,10 @@ void killcompetitors() {
 }
 
 void SIGINThandler(int sig) {
-	char INTtext[128];
-	sprintf(INTtext, "Info: Caught SIGINT. Exiting cleanly.  %d process(es) killed", killcount);
-	logtext(INTtext, true);
 	SIGINTcaught = true;
 }
 
 void SIGHUPhandler(int sig) {
-	logtext("Info: Caught SIGHUP. Configuration file re-read", true);
 	SIGHUPcaught = true;
 }
 
