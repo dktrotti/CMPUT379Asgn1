@@ -20,7 +20,7 @@ bool inProcArray(int val);
 void insertInProcArray(int val);
 void removeFromProcArray(int val);
 
-bool debug = true;
+bool debug = false;
 int interval = 5;
 int killcount = 0;
 int procarray[1024];
