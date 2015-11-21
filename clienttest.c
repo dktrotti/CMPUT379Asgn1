@@ -46,7 +46,7 @@ int main (int argc, char* argv[]) {
     char* serverhost = argv[1];
     int port = atoi(argv[2]);
 
-    void init_sockaddr (struct sockaddr_in *name,
+    init_sockaddr (struct sockaddr_in *name,
             const char *hostname,
             uint16_t port);
     int sock;
