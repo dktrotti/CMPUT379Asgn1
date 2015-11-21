@@ -28,11 +28,37 @@ read_from_client (int filedes)
 	} else {
 		/* Data read. */
 		if (buffer == "cfg") {
-			write(filedes, "pname1 120\npname2 60\npname3 40\n");
+			write(filedes, "pname1 120\npname2 60\npname3 40\n", 34);
 		}
 		printf ("Server: got message: `%s'\n", buffer);
 		return 0;
 	}
+}
+
+int make_socket (uint16_t port)
+{
+  int sock;
+  struct sockaddr_in name;
+
+  /* Create the socket. */
+  sock = socket (PF_INET, SOCK_STREAM, 0);
+  if (sock < 0)
+    {
+      perror ("socket");
+      exit (EXIT_FAILURE);
+    }
+
+  /* Give the socket a name. */
+  name.sin_family = AF_INET;
+  name.sin_port = htons (port);
+  name.sin_addr.s_addr = htonl (INADDR_ANY);
+  if (bind (sock, (struct sockaddr *) &name, sizeof (name)) < 0)
+    {
+      perror ("bind");
+      exit (EXIT_FAILURE);
+    }
+
+  return sock;
 }
 
 int main (int argc, char* argv[]) {
@@ -42,7 +68,7 @@ int main (int argc, char* argv[]) {
     }
     int port = atoi(argv[2]);
 
-	extern int make_socket (uint16_t port);
+	make_socket (uint16_t port);
 	int sock;
 	fd_set active_fd_set, read_fd_set;
 	int i;
@@ -50,7 +76,7 @@ int main (int argc, char* argv[]) {
 	size_t size;
 
 	/* Create the socket and set it up to accept connections. */
-	sock = make_socket (PORT);
+	sock = make_socket (port);
 	if (listen (sock, 1) < 0)
 		{
 			perror ("listen");
