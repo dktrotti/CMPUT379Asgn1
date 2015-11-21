@@ -9,15 +9,11 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-#define PORT                  5555
-#define MESSAGE         "Yow!!! Are we having fun yet?!?"
-#define SERVERHOST        "www.gnu.org"
-
 void
-write_to_server (int filedes) {
+write_to_server (int filedes, char* message) {
     int nbytes;
 
-    nbytes = write (filedes, MESSAGE, strlen (MESSAGE) + 1);
+    nbytes = write (filedes, message, strlen(message) + 1);
     if (nbytes < 0) {
         perror ("write");
         exit (EXIT_FAILURE);
@@ -25,8 +21,14 @@ write_to_server (int filedes) {
 }
 
 
-int
-main (void) {
+int main (int argc, char* argv[]) {
+    if (argc != 3) {
+        printf("Invalid number of arguments\n");
+        exit(1);
+    }
+    char serverhost[256] = argv[1];
+    int port = atoi(argv[2]);
+
     extern void init_sockaddr (struct sockaddr_in *name,
             const char *hostname,
             uint16_t port);
@@ -51,7 +53,11 @@ main (void) {
     }
 
     /* Send data to the server. */
-    write_to_server (sock);
+    write_to_server (sock, "cfg");
+    char config[256];
+    read(sock, config, 256);
+    printf("Client got: %s\n", config);
+    write_to_server(sock, "Killed processname (PID 3312) after 120 seconds.\n");
     close (sock);
     exit (EXIT_SUCCESS);
 }

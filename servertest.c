@@ -9,7 +9,6 @@
 #include <netinet/in.h>
 #include <netdb.h>
 
-#define PORT		5555
 #define MAXMSG	512
 
 int
@@ -19,27 +18,30 @@ read_from_client (int filedes)
 	int nbytes;
 
 	nbytes = read (filedes, buffer, MAXMSG);
-	if (nbytes < 0)
-		{
-			/* Read error. */
-			perror ("read");
-			exit (EXIT_FAILURE);
-		}
-	else if (nbytes == 0)
+	if (nbytes < 0) {
+		/* Read error. */
+		perror ("read");
+		exit (EXIT_FAILURE);
+	} else if (nbytes == 0) {
 		/* End-of-file. */
 		return -1;
-	else
-		{
-			/* Data read. */
-		
-			printf ("Server: got message: `%s'\n", buffer);
-			return 0;
+	} else {
+		/* Data read. */
+		if (buffer == "cfg") {
+			write(filedes, "pname1 120\npname2 60\npname3 40\n");
 		}
+		printf ("Server: got message: `%s'\n", buffer);
+		return 0;
+	}
 }
 
-int
-main (void)
-{
+int main (int argc, char* argv[]) {
+    if (argc != 2) {
+        printf("Invalid number of arguments\n");
+        exit(1);
+    }
+    int port = atoi(argv[2]);
+
 	extern int make_socket (uint16_t port);
 	int sock;
 	fd_set active_fd_set, read_fd_set;
