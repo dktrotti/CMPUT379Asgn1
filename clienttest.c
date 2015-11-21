@@ -69,6 +69,7 @@ int main (int argc, char* argv[]) {
     /* Send data to the server. */
     write_to_server (sock, "cfg");
     char config[256];
+    memset(config, 0, sizeof(config));
     read(sock, config, 256);
     printf("Client got: %s\n", config);
     write_to_server(sock, "Killed processname (PID 3312) after 120 seconds.\n");
