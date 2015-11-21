@@ -1,57 +1,61 @@
+//Source: http://www.gnu.org/software/libc/manual/html_node/Byte-Stream-Example.html
+
 #include <stdio.h>
+#include <errno.h>
 #include <stdlib.h>
 #include <unistd.h>
-#include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
 #include <netinet/in.h>
-#include <netdb.h> 
+#include <netdb.h>
 
-void error(const char *msg)
+#define PORT            5555
+#define MESSAGE         "Yow!!! Are we having fun yet?!?"
+#define SERVERHOST      "www.gnu.org"
+
+void
+write_to_server (int filedes)
 {
-    perror(msg);
-    exit(0);
+  int nbytes;
+
+  nbytes = write (filedes, MESSAGE, strlen (MESSAGE) + 1);
+  if (nbytes < 0)
+    {
+      perror ("write");
+      exit (EXIT_FAILURE);
+    }
 }
 
-int main(int argc, char *argv[])
-{
-    int sockfd, portno, n;
-    struct sockaddr_in serv_addr;
-    struct hostent *server;
 
-    char buffer[256];
-    if (argc < 3) {
-       fprintf(stderr,"usage %s hostname port\n", argv[0]);
-       exit(0);
+int
+main (void)
+{
+  extern void init_sockaddr (struct sockaddr_in *name,
+                             const char *hostname,
+                             uint16_t port);
+  int sock;
+  struct sockaddr_in servername;
+
+  /* Create the socket. */
+  sock = socket (PF_INET, SOCK_STREAM, 0);
+  if (sock < 0)
+    {
+      perror ("socket (client)");
+      exit (EXIT_FAILURE);
     }
-    portno = atoi(argv[2]);
-    sockfd = socket(AF_INET, SOCK_STREAM, 0);
-    if (sockfd < 0) 
-        error("ERROR opening socket");
-    server = gethostbyname(argv[1]);
-    if (server == NULL) {
-        fprintf(stderr,"ERROR, no such host\n");
-        exit(0);
+
+  /* Connect to the server. */
+  init_sockaddr (&servername, SERVERHOST, PORT);
+  if (0 > connect (sock,
+                   (struct sockaddr *) &servername,
+                   sizeof (servername)))
+    {
+      perror ("connect (client)");
+      exit (EXIT_FAILURE);
     }
-    bzero((char *) &serv_addr, sizeof(serv_addr));
-    serv_addr.sin_family = AF_INET;
-    bcopy((char *)server->h_addr, 
-         (char *)&serv_addr.sin_addr.s_addr,
-         server->h_length);
-    serv_addr.sin_port = htons(portno);
-    if (connect(sockfd,(struct sockaddr *) &serv_addr,sizeof(serv_addr)) < 0) 
-        error("ERROR connecting");
-    printf("Please enter the message: ");
-    bzero(buffer,256);
-    fgets(buffer,255,stdin);
-    n = write(sockfd,buffer,strlen(buffer));
-    if (n < 0) 
-         error("ERROR writing to socket");
-    bzero(buffer,256);
-    n = read(sockfd,buffer,255);
-    if (n < 0) 
-         error("ERROR reading from socket");
-    printf("%s\n",buffer);
-    close(sockfd);
-    return 0;
+
+  /* Send data to the server. */
+  write_to_server (sock);
+  close (sock);
+  exit (EXIT_SUCCESS);
 }
