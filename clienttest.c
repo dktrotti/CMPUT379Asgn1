@@ -8,9 +8,9 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netdb.h>
+#include <string.h>
 
-void
-write_to_server (int filedes, char* message) {
+void write_to_server (int filedes, char* message) {
     int nbytes;
 
     nbytes = write (filedes, message, strlen(message) + 1);
@@ -20,16 +20,33 @@ write_to_server (int filedes, char* message) {
     }
 }
 
+void init_sockaddr (struct sockaddr_in *name,
+               const char *hostname,
+               uint16_t port)
+{
+  struct hostent *hostinfo;
+
+  name->sin_family = AF_INET;
+  name->sin_port = htons (port);
+  hostinfo = gethostbyname (hostname);
+  if (hostinfo == NULL)
+    {
+      fprintf (stderr, "Unknown host %s.\n", hostname);
+      exit (EXIT_FAILURE);
+    }
+  name->sin_addr = *(struct in_addr *) hostinfo->h_addr;
+}
+
 
 int main (int argc, char* argv[]) {
     if (argc != 3) {
         printf("Invalid number of arguments\n");
         exit(1);
     }
-    char serverhost[256] = argv[1];
+    char* serverhost = argv[1];
     int port = atoi(argv[2]);
 
-    extern void init_sockaddr (struct sockaddr_in *name,
+    void init_sockaddr (struct sockaddr_in *name,
             const char *hostname,
             uint16_t port);
     int sock;
@@ -43,7 +60,7 @@ int main (int argc, char* argv[]) {
     }
 
     /* Connect to the server. */
-    init_sockaddr (&servername, SERVERHOST, PORT);
+    init_sockaddr (&servername, serverhost, port);
     if (0 > connect (sock,
             (struct sockaddr *) &servername,
             sizeof (servername)))
