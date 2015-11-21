@@ -9,11 +9,17 @@
 #include <fcntl.h>
 #include "memwatch.h"
 
+#define MAXMSG	512
+#define INTERVAL 5
+
 void SIGINThandler(int sig);
 void killcompetitors();
 bool inProcArray(int val);
 void insertInProcArray(int val);
 void removeFromProcArray(int val);
+void writeToServer(int filedes, char* message);
+int readFromServer(int filedes, char* buf);
+void init_sockaddr (struct sockaddr_in *name, const char *hostname, uint16_t port);
 
 bool SIGINTcaught = false;
 int procarray[1024];
@@ -36,8 +42,22 @@ int main (int argc, char* argv[]) {
 		//logtext("Error: Invalid number of arguments.", debug);
 		exit(1);
 	}
+	char* serverhost = argv[1];
+	int port = atoi(argv[2]);
 
 	//Set up socket
+	sock = socket (PF_INET, SOCK_STREAM, 0);
+	if (sock < 0) {
+		perror ("socket (client)");
+		exit (EXIT_FAILURE);
+	}
+
+	//Connect to the server
+	init_sockaddr (&servername, serverhost, port);
+	if (0 > connect (sock, (struct sockaddr *) &servername, sizeof (servername))) {
+		perror ("connect (client)");
+		exit (EXIT_FAILURE);
+	}
 
 	pipe(workpipe);
 	pipe(killpipe);
@@ -48,22 +68,40 @@ int main (int argc, char* argv[]) {
 	FILE* cmdfp;
 	int pid;
 
+	char config[MAXMSG];
+
 	while (true) {
 		if (SIGINTcaught) {
 			killcompetitors();
 			exit(0);
 		}
 		//Check for new config string
+		writeToServer(sock, "cfg");
+		readFromServer(sock, config);
 
+		//Source: http://stackoverflow.com/a/17983619
 		//Loop through config string
+		char * curLine = config;
+		while (curLine) {
+			char * nextLine = strchr(curLine, '\n');
+			if (nextLine) {
+				*nextLine = '\0';  // temporarily terminate the current line
+			}
 			//Read and set the seconds value
+			sscanf(curLine, "%s %d", currentprocess, &seconds);
 			//Find PIDs for the process name
 			//If none, tell server through socket
 			//Loop through PIDs
 				//Check for PID in monitored PIDs
 				//Tell server about monitoring
 				//Spawn child if needed and begin monitoring
+			if (nextLine) {
+				*nextLine = '\n';  // then restore newline-char, just to be tidy
+			}
+			curLine = nextLine ? (nextLine+1) : NULL;
+		}
 		//Wait
+		sleep(INTERVAL);
 	}
 }
 //====================================================================================
@@ -112,4 +150,43 @@ void removeFromProcArray(int val) {
 			break;
 		}
 	}
+}
+
+void writeToServer(int filedes, char* message) {
+	int nbytes;
+
+	nbytes = write(filedes, message, strlen(message) + 1);
+	if (nbytes < 0) {
+		perror("write");
+		exit(EXIT_FAILURE);
+	}
+}
+
+int readFromServer(int filedes, char* buf) {
+	int nbytes;
+
+	nbytes = read(filedes, buf, MAXMSG);
+	if (nbytes < 0) {
+		perror("read");
+		exit(EXIT_FAILURE);
+	} else if (nbytes == 0) {
+		//EOF
+		return -1;
+	} else {
+		return 0;
+	}
+}
+
+//Source: http://www.gnu.org/software/libc/manual/html_node/Inet-Example.html
+void init_sockaddr (struct sockaddr_in *name, const char *hostname, uint16_t port) {
+	struct hostent *hostinfo;
+
+	name->sin_family = AF_INET;
+	name->sin_port = htons (port);
+	hostinfo = gethostbyname (hostname);
+	if (hostinfo == NULL) {
+		fprintf (stderr, "Unknown host %s.\n", hostname);
+		exit (EXIT_FAILURE);
+	}
+	name->sin_addr = *(struct in_addr *) hostinfo->h_addr;
 }

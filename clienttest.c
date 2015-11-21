@@ -20,10 +20,7 @@ void write_to_server (int filedes, char* message) {
     }
 }
 
-void init_sockaddr (struct sockaddr_in *name,
-               const char *hostname,
-               uint16_t port)
-{
+void init_sockaddr (struct sockaddr_in *name, const char *hostname, uint16_t port) {
   struct hostent *hostinfo;
 
   name->sin_family = AF_INET;
@@ -67,12 +64,22 @@ int main (int argc, char* argv[]) {
     }
 
     /* Send data to the server. */
+    sleep(5);
     write_to_server (sock, "cfg");
     char config[256];
     memset(config, 0, sizeof(config));
     read(sock, config, 256);
-    printf("Client got: %s\n", config);
+    //printf("Client got: %s\n", config);
+    char * curLine = config;
+    while(curLine) {
+        char * nextLine = strchr(curLine, '\n');
+        if (nextLine) *nextLine = '\0';  // temporarily terminate the current line
+        printf("curLine=[%s]\n", curLine);
+        if (nextLine) *nextLine = '\n';  // then restore newline-char, just to be tidy    
+        curLine = nextLine ? (nextLine+1) : NULL;
+    }
     write_to_server(sock, "Killed processname (PID 3312) after 120 seconds.\n");
+    //sleep(5);
     close (sock);
     exit (EXIT_SUCCESS);
 }
