@@ -27,10 +27,11 @@ read_from_client (int filedes)
 		return -1;
 	} else {
 		/* Data read. */
-		if (buffer == "cfg") {
-			write(filedes, "pname1 120\npname2 60\npname3 40\n", 34);
+		if (strcmp(buffer, "cfg") == 0) {
+			printf("Sending config\n");
+			write(filedes, "pname1 120\npname2 60\npname3 40\n", 512);
 		}
-		printf ("Server: got message: `%s'\n", buffer);
+		printf ("Server: got message: '%s'\n", buffer);
 		return 0;
 	}
 }
@@ -66,7 +67,7 @@ int main (int argc, char* argv[]) {
         printf("Invalid number of arguments\n");
         exit(1);
     }
-    int port = atoi(argv[2]);
+    int port = atoi(argv[1]);
 
 	int sock;
 	fd_set active_fd_set, read_fd_set;
@@ -75,6 +76,7 @@ int main (int argc, char* argv[]) {
 	size_t size;
 
 	/* Create the socket and set it up to accept connections. */
+	printf("Making socket\n");
 	sock = make_socket (port);
 	if (listen (sock, 1) < 0)
 		{
@@ -82,6 +84,7 @@ int main (int argc, char* argv[]) {
 			exit (EXIT_FAILURE);
 		}
 
+	printf("Initializing descriptors\n");
 	/* Initialize the set of active sockets. */
 	FD_ZERO (&active_fd_set);
 	FD_SET (sock, &active_fd_set);
@@ -89,6 +92,7 @@ int main (int argc, char* argv[]) {
 	while (1)
 		{
 			/* Block until input arrives on one or more active sockets. */
+			printf("Waiting for input\n");
 			read_fd_set = active_fd_set;
 			if (select (FD_SETSIZE, &read_fd_set, NULL, NULL, NULL) < 0)
 				{
