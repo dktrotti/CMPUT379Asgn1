@@ -68,7 +68,6 @@ int main (int argc, char* argv[]) {
     }
     int port = atoi(argv[2]);
 
-	make_socket (uint16_t port);
 	int sock;
 	fd_set active_fd_set, read_fd_set;
 	int i;
