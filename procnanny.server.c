@@ -30,6 +30,8 @@ void readConfigFile(char* location, char* buffer);
 bool debug = true;
 int killcount = 0;
 
+bool SIGHUPcaught = false;
+bool SIGINTcaught = false;
 //====================================================================================
 //MAIN FUNCTION
 //====================================================================================
