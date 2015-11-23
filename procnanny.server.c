@@ -59,7 +59,7 @@ int main (int argc, char* argv[]) {
 	struct timeval tv;
 	char config[MAXMSG];
 
-	sock = make_socket (port);
+	sock = makeSocket(PORT);
 	if (listen (sock, 1) < 0) {
 		perror ("listen");
 		exit (EXIT_FAILURE);
@@ -84,7 +84,7 @@ int main (int argc, char* argv[]) {
 		tv.tv_sec = INTERVAL;
 		tv.tv_usec = 0;
 		
-		if (select (FD_SETSIZE, &read_fd_set, NULL, NULL, tv) < 0) {
+		if (select (FD_SETSIZE, &read_fd_set, NULL, NULL, &tv) < 0) {
 			perror ("select");
 			exit (EXIT_FAILURE);
 		}
