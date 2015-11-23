@@ -2,11 +2,16 @@
 #include <sys/types.h>
 #include <stdio.h>
 #include <stdlib.h>
+#include <errno.h>
 #include <time.h>
 #include <signal.h>
 #include <string.h>
 #include <stdbool.h>
 #include <fcntl.h>
+#include <sys/types.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <netdb.h>
 #include "memwatch.h"
 
 #define MAXMSG	512
@@ -89,6 +94,10 @@ int main (int argc, char* argv[]) {
 			}
 			//Read and set the seconds value
 			sscanf(curLine, "%s %d", currentprocess, &seconds);
+			printf("Received: %s %d\n", currentprocess, &seconds);
+			char temp[MAXMSG];
+			sprintf(temp, "Killed %s after %d seconds\n", currentprocess, &seconds);
+			writeToServer(sock, temp);
 			//Find PIDs for the process name
 			//If none, tell server through socket
 			//Loop through PIDs
