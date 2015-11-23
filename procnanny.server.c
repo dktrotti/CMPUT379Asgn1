@@ -23,6 +23,7 @@ void clearlogfile();
 void logtext(char* info, bool debug);
 void SIGHUPhandler(int sig);
 void SIGINThandler(int sig);
+void writeToClient(int filedes, char* message);
 int readFromClient(int filedes, char* buffer);
 int makeSocket(uint16_t port);
 void readConfigFile(char* location, char* buffer);
@@ -36,7 +37,7 @@ bool SIGINTcaught = false;
 //MAIN FUNCTION
 //====================================================================================
 int main (int argc, char* argv[]) {
-	//argv[1] == config file
+	//argv[1] == config file location
 	signal(SIGHUP, SIGHUPhandler);
 	signal(SIGINT, SIGINThandler);
 
@@ -68,10 +69,6 @@ int main (int argc, char* argv[]) {
 	FD_ZERO (&active_fd_set);
 	FD_SET (sock, &active_fd_set);
 
-	//Open config file
-	readConfigFile(argv[1], config);
-	printf("%s\n", config);
-
 	while (true) {
 		if (SIGHUPhandler) {
 			//Do something
@@ -80,6 +77,11 @@ int main (int argc, char* argv[]) {
 		if (SIGINTcaught) {
 			//Do something
 		}
+
+		//Read config file
+		memset(config, '\0', sizeof(config));
+		readConfigFile(argv[1], config);
+
 		read_fd_set = active_fd_set;
 		tv.tv_sec = INTERVAL;
 		tv.tv_usec = 0;
@@ -110,8 +112,13 @@ int main (int argc, char* argv[]) {
 						FD_CLR (i, &active_fd_set);
 					} else {
 						//Do something with data
-						//Send config file
-						//Read responses from clients
+						if (strcmp(databuf, "cfg") == 0) {
+							//Send config file
+							writeToClient(i, config);
+						} else {
+							//Read responses from clients
+							logtext(databuf, debug);
+						}
 					}
 				}
 			}
@@ -163,6 +170,16 @@ int readFromClient(int filedes, char* buffer) {
 		return -1;
 	} else {
 		return 0;
+	}
+}
+
+void writeToClient(int filedes, char* message) {
+	int nbytes;
+
+	nbytes = write(filedes, message, strlen(message) + 1);
+	if (nbytes < 0) {
+		perror("write");
+		exit(EXIT_FAILURE);
 	}
 }
 
