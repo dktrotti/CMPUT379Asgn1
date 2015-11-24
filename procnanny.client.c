@@ -101,8 +101,6 @@ int main (int argc, char* argv[]) {
 			}
 			//Read and set the seconds value
 			sscanf(curLine, "%s %d", currentprocess, &seconds);
-			char temp[MAXMSG];
-			writeToServer(sock, temp);
 
 
 
