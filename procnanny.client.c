@@ -101,9 +101,7 @@ int main (int argc, char* argv[]) {
 			}
 			//Read and set the seconds value
 			sscanf(curLine, "%s %d", currentprocess, &seconds);
-			printf("Received: %s %d\n", currentprocess, seconds);
 			char temp[MAXMSG];
-			sprintf(temp, "Killed %s after %d seconds", currentprocess, seconds);
 			writeToServer(sock, temp);
 
 
