@@ -200,7 +200,7 @@ void killcompetitors() {
 	FILE* compfp;
 	pid_t ownpid = getpid();
 	pid_t pid;
-	compfp = popen("pgrep procnanny", "r");
+	compfp = popen("pgrep procnanny.client", "r");
 	while(fscanf(compfp, "%u", &pid) > 0) {
 		if (pid != ownpid) {
 			kill(pid, SIGKILL);
