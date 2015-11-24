@@ -25,12 +25,15 @@ void removeFromProcArray(int val);
 void writeToServer(int filedes, char* message);
 int readFromServer(int filedes, char* buf);
 void init_sockaddr (struct sockaddr_in *name, const char *hostname, uint16_t port);
+void spawnchild();
 
 bool SIGINTcaught = false;
 int procarray[1024];
 
 int workpipe[2];
 int killpipe[2];
+
+int sock;
 
 //====================================================================================
 //MAIN FUNCTION
@@ -51,6 +54,8 @@ int main (int argc, char* argv[]) {
 	int port = atoi(argv[2]);
 
 	//Set up socket
+	struct sockaddr_in servername;
+
 	sock = socket (PF_INET, SOCK_STREAM, 0);
 	if (sock < 0) {
 		perror ("socket (client)");
@@ -74,6 +79,8 @@ int main (int argc, char* argv[]) {
 	int pid;
 
 	char config[MAXMSG];
+	int numbytes;
+	char readbuf[2];
 
 	while (true) {
 		if (SIGINTcaught) {
@@ -94,16 +101,86 @@ int main (int argc, char* argv[]) {
 			}
 			//Read and set the seconds value
 			sscanf(curLine, "%s %d", currentprocess, &seconds);
-			printf("Received: %s %d\n", currentprocess, &seconds);
+			printf("Received: %s %d\n", currentprocess, seconds);
 			char temp[MAXMSG];
-			sprintf(temp, "Killed %s after %d seconds\n", currentprocess, &seconds);
+			sprintf(temp, "Killed %s after %d seconds", currentprocess, seconds);
 			writeToServer(sock, temp);
-			//Find PIDs for the process name
-			//If none, tell server through socket
-			//Loop through PIDs
-				//Check for PID in monitored PIDs
-				//Tell server about monitoring
-				//Spawn child if needed and begin monitoring
+
+
+
+
+
+			char command[260] = "pgrep -x ";
+  	 		strcat(command, currentprocess);
+  	 		cmdfp = popen(command, "r");
+
+  	 		// Check if any processes exist
+  	 		if (fscanf(cmdfp, "%u", &pid) <= 0) {
+  	 	 		char buff[285];
+
+
+  	 	 		sprintf(buff, "Info: No '%s' processes found on node whatever", currentprocess);
+  	 	 		writeToServer(sock, buff);
+
+
+  	 		} else {
+  	 			// If processes are found
+  	 			if (!inProcArray(pid)) {
+  	 				char inittext[312];
+
+
+  	 				sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d) on node whatever", currentprocess, pid);
+  	 				writeToServer(sock, inittext);
+
+
+  	 				insertInProcArray(pid);
+
+					numbytes = read(killpipe[0], readbuf, sizeof(readbuf));
+  	 				if (numbytes == -1) {
+						//No children available
+						spawnchild(workpipe, killpipe);
+					} else {
+						//Children available
+					}
+
+					char workstring[260];
+					sprintf(workstring, "%s %d %d\n", currentprocess, pid, seconds);
+					write(workpipe[1], workstring, sizeof(workstring));
+  	 			}
+  	 		}
+
+  	 		// Continue reading processes from command
+  	 		while(fscanf(cmdfp, "%u", &pid) > 0) {
+  	 			if (!inProcArray(pid)) {
+  	 				char inittext[312];
+
+
+  	 				sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d) on node whatever", currentprocess, pid);
+  	 				writeToServer(sock, inittext);
+
+
+  	 				insertInProcArray(pid);
+
+					numbytes = read(killpipe[0], readbuf, sizeof(readbuf));
+  	 				if (numbytes == -1) {
+						//No children available
+						spawnchild(workpipe, killpipe);
+					} else {
+						//Children available
+					}
+
+					char workstring[260];
+					sprintf(workstring, "%s %d %d\n", currentprocess, pid, seconds);
+					write(workpipe[1], workstring, sizeof(workstring));
+  	 			}
+  	 		}
+
+  	 		pclose(cmdfp);
+
+
+
+
+
 			if (nextLine) {
 				*nextLine = '\n';  // then restore newline-char, just to be tidy
 			}
@@ -198,4 +275,45 @@ void init_sockaddr (struct sockaddr_in *name, const char *hostname, uint16_t por
 		exit (EXIT_FAILURE);
 	}
 	name->sin_addr = *(struct in_addr *) hostinfo->h_addr;
+}
+
+void spawnchild() {
+	pid_t pid;
+
+	if((pid = fork()) < 0) {
+		//Fork error
+	} else if (pid == 0) {
+		//Child process
+	    close(workpipe[1]); //Close writing end of workpipe
+	    close(killpipe[0]); //Close reading end of killpipe
+	    char targetname[256];
+	    pid_t targetpid;
+	    int seconds;
+	    while(true) {
+	    	char buf[260];
+	    	int readval = read(workpipe[0], buf, sizeof(buf));
+	    	if (readval == 0) {
+	    		exit(0);
+	    	}
+	    	sscanf(buf, "%s %d %d", targetname, &targetpid, &seconds);
+	    	sleep(seconds);
+	    	int killval = kill(targetpid, SIGKILL);
+	    	if (killval == 0) {
+	      		//Success
+	      		char infotext[320];
+
+
+	      		sprintf(infotext, "Action: PID %d (%s) killed after exceeding %d seconds on node whatever", targetpid, targetname, seconds);
+	      		writeToServer(sock, infotext);
+
+
+	    		write(killpipe[1], "k\n", 2);
+	    	} else {
+	    		write(killpipe[1], "n\n", 2);
+	    	}
+	    }
+	} else if (pid > 0) {
+		//Parent process
+		return;
+	}
 }
