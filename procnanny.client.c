@@ -34,6 +34,7 @@ int workpipe[2];
 int killpipe[2];
 
 int sock;
+char ownhostname[256];
 
 //====================================================================================
 //MAIN FUNCTION
@@ -52,6 +53,8 @@ int main (int argc, char* argv[]) {
 	}
 	char* serverhost = argv[1];
 	int port = atoi(argv[2]);
+
+	gethostname(ownhostname, 256);
 
 	//Set up socket
 	struct sockaddr_in servername;
@@ -115,7 +118,7 @@ int main (int argc, char* argv[]) {
   	 	 		char buff[285];
 
 
-  	 	 		sprintf(buff, "Info: No '%s' processes found on node whatever", currentprocess);
+  	 	 		sprintf(buff, "Info: No '%s' processes found on node %s", currentprocess, ownhostname);
   	 	 		writeToServer(sock, buff);
 
 
@@ -125,7 +128,7 @@ int main (int argc, char* argv[]) {
   	 				char inittext[312];
 
 
-  	 				sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d) on node whatever", currentprocess, pid);
+  	 				sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d) on node %s", currentprocess, pid, ownhostname);
   	 				writeToServer(sock, inittext);
 
 
@@ -151,7 +154,7 @@ int main (int argc, char* argv[]) {
   	 				char inittext[312];
 
 
-  	 				sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d) on node whatever", currentprocess, pid);
+  	 				sprintf(inittext, "Info: Initializing monitoring of process '%s' (PID %d) on node %s", currentprocess, pid, ownhostname);
   	 				writeToServer(sock, inittext);
 
 
@@ -191,6 +194,7 @@ int main (int argc, char* argv[]) {
 void SIGINThandler(int sig) {
 	SIGINTcaught = true;
 }
+
 void killcompetitors() {
 	//THERE CAN ONLY BE ONE!!!
 	FILE* compfp;
@@ -299,7 +303,7 @@ void spawnchild() {
 	      		char infotext[320];
 
 
-	      		sprintf(infotext, "Action: PID %d (%s) killed after exceeding %d seconds on node whatever", targetpid, targetname, seconds);
+	      		sprintf(infotext, "Action: PID %d (%s) killed after exceeding %d seconds on node %s", targetpid, targetname, seconds, ownhostname);
 	      		writeToServer(sock, infotext);
 
 

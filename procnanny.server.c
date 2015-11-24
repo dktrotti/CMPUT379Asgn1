@@ -20,6 +20,7 @@
 #define INTERVAL 5
 
 void clearlogfile();
+void killcompetitors();
 void logtext(char* info, bool debug);
 void SIGHUPhandler(int sig);
 void SIGINThandler(int sig);
@@ -30,6 +31,8 @@ void readConfigFile(char* location, char* buffer);
 
 bool debug = true;
 int killcount = 0;
+
+char ownhostname[256];
 
 bool SIGHUPcaught = false;
 bool SIGINTcaught = false;
@@ -48,7 +51,18 @@ int main (int argc, char* argv[]) {
 		exit(1);
 	}
 
+	if (gethostname(ownhostname, 256) < 0) {
+		logtext("Error: Failed to get hostname.", debug);
+	}
+
 	//Log PID/compname
+	char introstr[512];
+	sprintf(introstr, "procnanny server: PID %d on node %s, port %d", getpid(), ownhostname, PORT);
+	logtext(introstr, true);
+
+	FILE* infopointer = fopen(getenv("PROCNANNYSERVERINFO"), "w");
+	fprintf(infopointer, "NODE %s PID %d PORT %d", ownhostname, getpid(), PORT);
+	fclose(infopointer);
 
 	//Set up socket
 	int sock;
@@ -69,18 +83,22 @@ int main (int argc, char* argv[]) {
 	FD_ZERO (&active_fd_set);
 	FD_SET (sock, &active_fd_set);
 
+	//Read config file
+	memset(config, '\0', sizeof(config));
+	readConfigFile(argv[1], config);
+
 	while (true) {
-		if (SIGHUPhandler) {
-			//Do something
+		if (SIGHUPcaught) {
+			//Read config file
+			memset(config, '\0', sizeof(config));
+			readConfigFile(argv[1], config);
+			logtext("Info: Caught SIGHUP. Configuration file re-read", true);
+			SIGHUPcaught = false;
 		}
 
 		if (SIGINTcaught) {
 			//Do something
 		}
-
-		//Read config file
-		memset(config, '\0', sizeof(config));
-		readConfigFile(argv[1], config);
 
 		read_fd_set = active_fd_set;
 		tv.tv_sec = INTERVAL;
@@ -115,6 +133,8 @@ int main (int argc, char* argv[]) {
 						if (strcmp(databuf, "cfg") == 0) {
 							//Send config file
 							writeToClient(i, config);
+						} else if (strncmp(databuf, "Action: PID", 11)) {
+							killcount++;
 						} else {
 							//Read responses from clients
 							logtext(databuf, debug);
@@ -130,6 +150,19 @@ int main (int argc, char* argv[]) {
 void clearlogfile() {
 	FILE* logpointer = fopen(getenv("PROCNANNYLOGS"), "w");
 	fclose(logpointer);
+}
+
+void killcompetitors() {
+	//THERE CAN ONLY BE ONE!!!
+	FILE* compfp;
+	pid_t ownpid = getpid();
+	pid_t pid;
+	compfp = popen("pgrep procnanny.server", "r");
+	while(fscanf(compfp, "%u", &pid) > 0) {
+		if (pid != ownpid) {
+			kill(pid, SIGKILL);
+		}
+	}
 }
 
 void logtext(char* info, bool debug) {
