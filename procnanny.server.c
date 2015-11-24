@@ -98,6 +98,10 @@ int main (int argc, char* argv[]) {
 
 		if (SIGINTcaught) {
 			//Do something
+			char INTtext[128];
+			sprintf(INTtext, "Info: Caught SIGINT. Exiting cleanly.  %d process(es) killed on blah, blah", killcount);
+			logtext(INTtext, true);
+			exit(0);
 		}
 
 		read_fd_set = active_fd_set;
@@ -133,11 +137,12 @@ int main (int argc, char* argv[]) {
 						if (strcmp(databuf, "cfg") == 0) {
 							//Send config file
 							writeToClient(i, config);
-						} else if (strncmp(databuf, "Action: PID", 11)) {
-							killcount++;
 						} else {
 							//Read responses from clients
 							logtext(databuf, debug);
+							if (strncmp(databuf, "Action: PID", 11) == 0) {
+								killcount++;
+							}
 						}
 					}
 				}
