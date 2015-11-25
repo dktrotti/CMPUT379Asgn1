@@ -30,7 +30,7 @@ int readFromClient(int filedes, char* buffer);
 int makeSocket(uint16_t port);
 void readConfigFile(char* location, char* buffer);
 
-bool debug = true;
+bool debug = false;
 int killcount = 0;
 
 char ownhostname[256];
