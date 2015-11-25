@@ -1,5 +1,7 @@
 procnanny: procnanny.c
-	gcc -Wall -DMEMWATCH -DMW_STDIO procnanny.c memwatch.c -o procnanny
+	gcc -Wall -DMEMWATCH -DMW_STDIO procnanny.client.c memwatch.c -o procnanny.client
+	gcc -Wall -DMEMWATCH -DMW_STDIO procnanny.server.c memwatch.c -o procnanny.server
 
 clean:
-	rm procnanny
+	rm procnanny.client
+	rm procnanny.server
