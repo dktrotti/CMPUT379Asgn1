@@ -42,7 +42,7 @@ char ownhostname[256];
 int main (int argc, char* argv[]) {
 	//argv[1] == location
 	//argv[2] == port
-	signal(SIGINT, SIGINThandler);
+	//signal(SIGINT, SIGINThandler);
 
 	int seconds = 0;
 	char currentprocess[255];

@@ -23,3 +23,4 @@ http://www.gnu.org/software/libc/manual/html_node/Byte-Stream-Example.html
 http://www.gnu.org/software/libc/manual/html_node/Server-Example.html
 http://www.gnu.org/software/libc/manual/html_node/Inet-Example.html
 http://stackoverflow.com/a/17983619
+http://stackoverflow.com/a/10236702

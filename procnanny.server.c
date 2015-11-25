@@ -13,6 +13,7 @@
 #include <netinet/in.h>
 #include <netdb.h>
 #include <sys/time.h>
+#include <arpa/inet.h>
 #include "memwatch.h"
 
 #define PORT 7701
@@ -33,6 +34,9 @@ bool debug = true;
 int killcount = 0;
 
 char ownhostname[256];
+char nodelist[4096];
+char config[MAXMSG];
+char configpath[256];
 
 bool SIGHUPcaught = false;
 bool SIGINTcaught = false;
@@ -41,6 +45,8 @@ bool SIGINTcaught = false;
 //====================================================================================
 int main (int argc, char* argv[]) {
 	//argv[1] == config file location
+	sprintf(configpath, "%s", argv[1]);
+
 	signal(SIGHUP, SIGHUPhandler);
 	signal(SIGINT, SIGINThandler);
 
@@ -72,7 +78,6 @@ int main (int argc, char* argv[]) {
 	size_t size;
 	char databuf[MAXMSG];
 	struct timeval tv;
-	char config[MAXMSG];
 
 	sock = makeSocket(PORT);
 	if (listen (sock, 1) < 0) {
@@ -88,29 +93,30 @@ int main (int argc, char* argv[]) {
 	readConfigFile(argv[1], config);
 
 	while (true) {
+		read_fd_set = active_fd_set;
+		tv.tv_sec = INTERVAL;
+		tv.tv_usec = 0;
+		
+		if (select (FD_SETSIZE, &read_fd_set, NULL, NULL, &tv) < 0) {
+			// perror ("select");
+			// exit (EXIT_FAILURE);
+		}
+
 		if (SIGHUPcaught) {
 			//Read config file
 			memset(config, '\0', sizeof(config));
 			readConfigFile(argv[1], config);
 			logtext("Info: Caught SIGHUP. Configuration file re-read", true);
 			SIGHUPcaught = false;
+			continue;
 		}
 
 		if (SIGINTcaught) {
 			//Do something
 			char INTtext[128];
-			sprintf(INTtext, "Info: Caught SIGINT. Exiting cleanly.  %d process(es) killed on blah, blah", killcount);
+			sprintf(INTtext, "Info: Caught SIGINT. Exiting cleanly.  %d process(es) killed on%s", killcount, nodelist);
 			logtext(INTtext, true);
 			exit(0);
-		}
-
-		read_fd_set = active_fd_set;
-		tv.tv_sec = INTERVAL;
-		tv.tv_usec = 0;
-		
-		if (select (FD_SETSIZE, &read_fd_set, NULL, NULL, &tv) < 0) {
-			perror ("select");
-			exit (EXIT_FAILURE);
 		}
 
 		//Service all the sockets with input pending
@@ -127,6 +133,13 @@ int main (int argc, char* argv[]) {
 						exit (EXIT_FAILURE);
 					}
 					FD_SET (new, &active_fd_set);
+
+					//Get client name
+					//Source: http://stackoverflow.com/a/10236702
+					struct in_addr ipv4addr;
+
+					inet_pton(AF_INET, inet_ntoa(clientname.sin_addr), &ipv4addr);
+					sprintf(nodelist, "%s %s", nodelist, gethostbyaddr(&ipv4addr, sizeof ipv4addr, AF_INET)->h_name);
 				} else {
 					//Data arriving on an already-connected socket
 					if (readFromClient (i, databuf) < 0) {
@@ -189,10 +202,19 @@ void logtext(char* info, bool debug) {
 
 void SIGHUPhandler(int sig) {
 	SIGHUPcaught = true;
+
+	// logtext("Info: Caught SIGHUP. Configuration file re-read", true);
+	// memset(config, '\0', sizeof(config));
+	// readConfigFile(configpath, config);
 }
 
 void SIGINThandler(int sig) {
 	SIGINTcaught = true;
+
+	// char INTtext[128];
+	// sprintf(INTtext, "Info: Caught SIGINT. Exiting cleanly.  %d process(es) killed on %s", killcount, nodelist);
+	// logtext(INTtext, true);
+	// exit(0);
 }
 
 int readFromClient(int filedes, char* buffer) {
